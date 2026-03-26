@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="am">
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>የሯጮች ውድድር - ኸሊል እና ነጃት</title>
+    <style>
+        body { margin: 0; overflow: hidden; background: #2e7d32; touch-action: none; font-family: 'Segoe UI', sans-serif; }
+        canvas { display: block; }
+        #info { position: fixed; top: 10px; width: 100%; text-align: center; color: white; font-size: 20px; text-shadow: 2px 2px 4px black; pointer-events: none; z-index: 10; }
+    </style>
+</head>
+<body>
+
+<div id="info">
+    <div id="dist">አንተ: 0m | እሱ: 0m</div>
+    <div id="msg" style="color: gold; font-weight: bold; font-size: 24px;"></div>
+</div>
+<canvas id="gameCanvas"></canvas>
+
+<script>
+    const canvas = document.getElementById("gameCanvas");
+    const ctx = canvas.getContext("2d");
+
+    // የስልክ ስክሪን መጠን ማስተካከያ
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+
+    // የተጫዋቾች መረጃ
+    let player = { x: canvas.width * 0.25, y: canvas.height - 150, targetX: canvas.width * 0.25, speed: 5, dist: 0 };
+    let auto = { x: canvas.width * 0.75, y: canvas.height - 150, speed: 5.3, dist: 0 }; // ኮምፒውተሩ ትንሽ ይፈጥናል
+    
+    let objects = [];
+    let gameFrame = 0;
+    let roadOffset = 0;
+    let gameActive = true;
+
+    // የስልክ ንክኪ መቆጣጠሪያ (ከግራ ወደ ቀኝ ለመንቀሳቀስ)
+    window.addEventListener("touchstart", (e) => {
+        if (!gameActive) return;
+        let touchX = e.touches[0].clientX;
+        // የአንተ መንገድ በግራ በኩል ስለሆነ በዛ ውስጥ ብቻ እንዲንቀሳቀስ
+        if (touchX < canvas.width * 0.25) {
+            player.targetX = canvas.width * 0.15; // ግራ መስመር
+        } else if (touchX < canvas.width * 0.5) {
+            player.targetX = canvas.width * 0.35; // ቀኝ መስመር
+        }
+    });
+
+    // እንቅፋትና ስጦታ ማመንጨት
+    function spawn() {
+        if (gameFrame % 90 === 0) { // በየ 1.5 ሰከንዱ (90 ፍሬም)
+            let isGift = Math.random() < 0.25; // 25% ስጦታ፣ 75% እንቅፋት
+            objects.push({
+                x: Math.random() < 0.5 ? canvas.width * 0.15 : canvas.width * 0.35,
+                y: -60, // ከስክሪን ውጪ እንዲጀምር
+                type: isGift ? "gift" : "obs",
+                emoji: isGift ? "🎁" : "🚧",
+                name: isGift ? "ኸሊል" : "ነጃት",
+                color: isGift ? "#00FF00" : "#FF3333" // አረንጓዴ ለኸሊል፣ ቀይ ለነጃት
+            });
+        }
+    }
+
+    // የጌም ለውጦች ማዘመኛ
+    function update() {
+        if (!gameActive) return;
+        gameFrame++;
+        roadOffset += player.speed; // የመንገዱ ፍጥነት ከተጫዋቹ ጋር ይሄዳል
+
+        // የተጫዋቹ ለስላሳ ግራ/ቀኝ እንቅስቃሴ
+        player.x += (player.targetX - player.x) * 0.2;
+
+        // ርቀት መጨመር
+        player.dist += player.speed / 10;
+        auto.dist += auto.speed / 10;
+
+        // እንቅፋቶችና ስጦታዎች እንቅስቃሴ
+        objects.forEach((obj, i) => {
+            obj.y += 5; // ወደ ታች የመውረጃ ፍጥነት
+
+            // ግጭት መፈተሽ (ከተጫዋቹ ጋር)
+            if (Math.abs(obj.y - player.y) < 40 && Math.abs(obj.x - player.x) < 30) {
+                if (obj.type === "obs") {
+                    player.speed = 2; // ፍጥነት ይቀንሳል (ነጃት)
+                    showMsg("ተጋጨህ! 🐢");
+                    setTimeout(() => player.speed = 5, 1500);
+                } else {
+                    player.speed = 11; // ፍጥነት ይጨምራል (ኸሊል)
+                    showMsg("በጣም ፈጣን! ⚡");
+                    setTimeout(() => player.speed = 5, 2000);
+                }
+                objects.splice(i, 1); // ከተጋጨ በኋላ ይጠፋል
+            }
+            // ከስክሪን ሲወጣ ማጥፋት
+            if (obj.y > canvas.height) objects.splice(i, 1);
+        });
+
+        spawn();
+        document.getElementById("dist").innerText = `አንተ: ${Math.floor(player.dist)}m | እሱ: ${Math.floor(auto.dist)}m`;
+        
+        // ማሸነፍ/መሸነፍ መፈተሽ
+        if (player.dist >= 1000) { gameActive = false; alert("አሸነፍክ! 🎉"); location.reload(); }
+        if (auto.dist >= 1000) { gameActive = false; alert("ተሸነፍክ! 🚩"); location.reload(); }
+    }
+
+    function showMsg(txt) {
+        document.getElementById("msg").innerText = txt;
+        setTimeout(() => document.getElementById("msg").innerText = "", 1000);
+    }
+
+    // በስክሪን ላይ መሳል
+    function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // አስፋልት መንገዶች
+        ctx.fillStyle = "#444";
+        ctx.fillRect(canvas.width * 0.1, 0, canvas.width * 0.35, canvas.height); // የአንተ መንገድ
+        ctx.fillRect(canvas.width * 0.6, 0, canvas.width * 0.35, canvas.height); // የኮምፒውተር መንገድ
+
+        // የሚንቀሳቀስ የመንገድ ምልክት (ነጭ መስመር)
+        ctx.strokeStyle = "white";
+        ctx.setLineDash([30, 30]);
+        ctx.lineDashOffset = -roadOffset * 1.5; // የሩጫ ስሜት ይሰጣል
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.moveTo(canvas.width * 0.27, 0); ctx.lineTo(canvas.width * 0.27, canvas.height);
+        ctx.moveTo(canvas.width * 0.77, 0); ctx.lineTo(canvas.width * 0.77, canvas.height);
+        ctx.stroke();
+
+        ctx.font = "55px Arial";
+        
+        // የሩጫ አኒሜሽን (ምስሉን በመቀያየር)
+        let pEmoji = (Math.floor(gameFrame / 10) % 2 === 0) ? "🏃‍♂️" : "🏃";
+        let aEmoji = (Math.floor(gameFrame / 12) % 2 === 0) ? "🏃‍♂️" : "🏃";
+
+        // አንተ (ተጫዋች)
+        ctx.fillText(pEmoji, player.x - 28, player.y);
+        // ኮምፒውተሩ (Auto)
+        ctx.fillText(aEmoji, auto.x - 28, auto.y);
+
+        // እንቅፋትና ስጦታ (ከነስማቸው) መሳል
+        objects.forEach(obj => {
+            // ምስሉን (Emoji) መሳል
+            ctx.font = "50px Arial";
+            ctx.fillText(obj.emoji, obj.x - 25, obj.y);
+
+            // ስሙን (ኸሊል/ነጃት) መሳል
+            ctx.font = "bold 20px 'Segoe UI'";
+            ctx.fillStyle = obj.color;
+            ctx.textAlign = "center";
+            ctx.fillText(obj.name, obj.x, obj.y - 45); // ከምስሉ በላይ
+        });
+
+        update();
+        requestAnimationFrame(draw);
+    }
+
+    // ጌሙን አስጀምር
+    draw();
+</script>
+</body>
+</html>
